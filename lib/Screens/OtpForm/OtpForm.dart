@@ -6,7 +6,19 @@ import 'package:penny/Components/Global/Button.dart';
 import 'package:penny/Screens/mainScreen/index.dart';
 
 class OtpForm extends StatefulWidget {
-  const OtpForm({super.key});
+  // sendOtp: function to request/resend an OTP (optional)
+  // verifyOtp: function to verify entered OTP (optional)
+  // nextScreen: Widget to open after successful verification (optional)
+  final Future<bool> Function()? sendOtp;
+  final Future<bool> Function(String code)? verifyOtp;
+  final Widget? nextScreen;
+
+  const OtpForm({
+    super.key,
+    this.sendOtp,
+    this.verifyOtp,
+    this.nextScreen,
+  });
 
   @override
   State<OtpForm> createState() => _OtpFormState();
@@ -18,6 +30,7 @@ class _OtpFormState extends State<OtpForm> {
   int counterDecreasing = 59;
   String countdown = "59";
   bool allow = true;
+  String _enteredCode = '';
 
   void startCounter() {
     allow = false;
@@ -89,6 +102,9 @@ class _OtpFormState extends State<OtpForm> {
                     borderColor: Colors.white,
                     borderRadius: BorderRadius.circular(10),
                     contentPadding: const EdgeInsets.only(bottom: 2),
+                    onSubmit: (code) {
+                      _enteredCode = code;
+                    },
                   ),
                   const SizedBox(height: 10),
                   const Text(
@@ -98,7 +114,21 @@ class _OtpFormState extends State<OtpForm> {
                   const SizedBox(height: 5),
                   allow
                       ? InkWell(
-                          onTap: startCounter,
+                          onTap: () async {
+                            // call provided sendOtp if available, otherwise just start counter
+                            bool ok = true;
+                            if (widget.sendOtp != null) {
+                              ok = await widget.sendOtp!();
+                            }
+                            if (ok) startCounter();
+                            if (!ok) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Failed to resend OTP')),
+                                );
+                              }
+                            }
+                          },
                           child: const Text(
                             "Resend an OTP!",
                             style: TextStyle(
@@ -136,16 +166,38 @@ class _OtpFormState extends State<OtpForm> {
               ),
               CustomButton(
                 name: "Confirm",
-                onPress: () {
-                  if (_formKey.currentState!.validate()) {
-                    _timer?.cancel(); // Cancel the timer before navigating
+                onPress: () async {
+                  if (!_formKey.currentState!.validate()) return;
+                  _timer?.cancel(); // Cancel the timer before navigating
+
+                  bool verified = true;
+                  if (widget.verifyOtp != null) {
+                    verified = await widget.verifyOtp!(_enteredCode);
+                  }
+
+                  if (!verified) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Invalid or expired code')),
+                      );
+                    }
+                    return;
+                  }
+
+                  if (widget.nextScreen != null) {
                     Navigator.pushReplacement(
                       context,
-                      MaterialPageRoute(
-                        builder: (context) => const mainScreen(initialPage: 0),
-                      ),
+                      MaterialPageRoute(builder: (context) => widget.nextScreen!),
                     );
+                    return;
                   }
+
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const mainScreen(initialPage: 0),
+                    ),
+                  );
                 },
               ),
             ],

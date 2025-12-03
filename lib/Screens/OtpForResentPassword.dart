@@ -2,9 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:penny/Screens/OtpForm/OtpForm.dart';
 
 class ResetPasswordOtp extends StatefulWidget {
-  static route() =>
-      MaterialPageRoute(builder: (context) => const ResetPasswordOtp());
-  const ResetPasswordOtp({super.key});
+  final Future<bool> Function()? sendOtp;
+  final Future<bool> Function(String code)? verifyOtp;
+  final Widget? nextScreen;
+
+  static route({
+    Future<bool> Function()? sendOtp,
+    Future<bool> Function(String code)? verifyOtp,
+    Widget? nextScreen,
+  }) =>
+      MaterialPageRoute(
+          builder: (context) => ResetPasswordOtp(
+                sendOtp: sendOtp,
+                verifyOtp: verifyOtp,
+                nextScreen: nextScreen,
+              ));
+
+  const ResetPasswordOtp({
+    super.key,
+    this.sendOtp,
+    this.verifyOtp,
+    this.nextScreen,
+  });
 
   @override
   State<ResetPasswordOtp> createState() => _ResetPasswordOtpState();
@@ -62,7 +81,11 @@ class _ResetPasswordOtpState extends State<ResetPasswordOtp> {
                           ],
                         ),
                       ),
-                      const OtpForm()
+                      OtpForm(
+                        sendOtp: widget.sendOtp,
+                        verifyOtp: widget.verifyOtp,
+                        nextScreen: widget.nextScreen,
+                      )
                     ],
                   ),
                 ),

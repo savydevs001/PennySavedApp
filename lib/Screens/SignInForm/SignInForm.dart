@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:penny/Components/Global/Button.dart';
 import 'package:penny/Components/Global/TextField.dart';
 import 'package:penny/Screens/ResetPassword.dart';
-
+import 'package:penny/Screens/OtpForResentPassword.dart';
+import 'package:penny/Services/auth_service.dart';
+import 'package:penny/Screens/mainScreen/Screens/homeScreen/HomePage.dart';
+import 'package:penny/Screens/mainScreen/index.dart';
 class SignInForm extends StatefulWidget {
   const SignInForm({super.key});
 
@@ -90,12 +93,64 @@ class _SignInFormState extends State<SignInForm> {
           ),
           CustomButton(
             name: "Sign In",
-            onPress: () {
-              if (_formKey.currentState!.validate()) {
+            onPress: () async {
+              if (!_formKey.currentState!.validate()) return;
+
+              final email = _emailController.text.trim();
+              final password = _passwordController.text;
+
+              // call AuthService.login
+              final result = await AuthService().login(email, password);
+
+              final status = result['statusCode'] ?? 500;
+              final message = result['message'] ?? 'An error occurred';
+
+              if (status == 404) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Sign-up Successful!")),
+                  SnackBar(content: Text('User not found')),
                 );
+                return;
               }
+
+              if (status == 401) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Invalid credentials')),
+                );
+                return;
+              }
+
+              if (result['twoFactorRequired'] == true) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(message)),
+                );
+                // navigate to OTP screen: pass send/verify callbacks and nextScreen
+                Navigator.push(
+                  context,
+                  ResetPasswordOtp.route(
+                    sendOtp: () => AuthService().sendOtp(email, purpose: 'login'),
+                    verifyOtp: (code) => AuthService().verifyOtp(email, code, purpose: 'login'),
+                    nextScreen: const mainScreen(initialPage: 0),
+                  ),
+                );
+                return;
+              }
+
+              if (result['success'] == true) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(message)),
+                );
+                // Navigate to home/dashboard
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const mainScreen()),
+                );
+                return;
+              }
+
+              // fallback
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(message)),
+              );
             },
           ),
         ],

@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:penny/Components/Global/Button.dart';
 import 'package:penny/Components/Global/TextField.dart';
+import 'package:penny/Services/auth_service.dart';
+import 'package:penny/Screens/mainScreen/Screens/homeScreen/HomePage.dart';
 
 class SignUpForm extends StatefulWidget {
   const SignUpForm({super.key});
@@ -14,6 +16,10 @@ class _SignUpFormState extends State<SignUpForm> {
   final _formKey = GlobalKey<FormState>();
 
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _firstNameController = TextEditingController();
+  final TextEditingController _lastNameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final AuthService _authService = AuthService();
 
   bool isVisible = false;
   bool isVisibleforConfirm = false;
@@ -33,8 +39,7 @@ class _SignUpFormState extends State<SignUpForm> {
     if (value == null || value.isEmpty) {
       return "Your password doesn't match the first one you entered";
     }
-    final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
-    if (!emailRegex.hasMatch(value)) {
+    if (value != _passwordController.text) {
       return "Your password doesn't match the first one you entered";
     }
     return null;
@@ -84,21 +89,18 @@ class _SignUpFormState extends State<SignUpForm> {
             ),
           ]),
           CustomTextField(
+            controller: _passwordController,
             hintText: "Password",
             isPassword: isVisible,
             labelText: 'Password',
             suffixIcon: isVisible
                 ? IconButton(
                     icon: const Icon(Icons.visibility_off_outlined),
-                    onPressed: () {
-                      setVisibility();
-                    },
+                    onPressed: setVisibility,
                   )
                 : IconButton(
                     icon: const Icon(Icons.visibility_outlined),
-                    onPressed: () {
-                      setVisibility();
-                    },
+                    onPressed: setVisibility,
                   ),
           ),
           CustomTextField(
@@ -152,23 +154,28 @@ class _SignUpFormState extends State<SignUpForm> {
           ),
           CustomButton(
             name: "Sign Up",
-            onPress: () {
-              print("hello!");
-
-              final emailError = _validateEmail(_emailController.text);
-              if (emailError == null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Sign-up Successful!")),
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(emailError)),
-                );
-              }
+            onPress: () async {
               if (_formKey.currentState!.validate()) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Sign-up Successful!")),
-                );
+                final firstName = _firstNameController.text;
+                final lastName = _lastNameController.text;
+                final email = _emailController.text;
+                final password = _passwordController.text;
+
+                final token = await _authService.signUp(firstName, lastName, email, password);
+
+                if (token != null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Sign-up Successful!")),
+                  );
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const HomePage()),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Sign-up Failed!")),
+                  );
+                }
               }
             },
           ),
