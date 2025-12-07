@@ -7,9 +7,9 @@ class ApiService {
   ApiService({required this.baseUrl});
 
   // GET Request
-  Future<dynamic> get(String endpoint) async {
+  Future<dynamic> get(String endpoint, {Map<String, String>? headers}) async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl$endpoint'));
+      final response = await http.get(Uri.parse('$baseUrl$endpoint'), headers: headers);
       _debugResponse(response);
       return _handleResponse(response);
     } catch (e) {
@@ -19,11 +19,11 @@ class ApiService {
   }
 
   // POST Request
-  Future<dynamic> post(String endpoint, Map<String, dynamic> body) async {
+  Future<dynamic> post(String endpoint, Map<String, dynamic> body, {Map<String, String>? headers}) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl$endpoint'),
-        headers: {'Content-Type': 'application/json'},
+        headers: headers ?? {'Content-Type': 'application/json'},
         body: jsonEncode(body),
       );
       _debugResponse(response);
@@ -35,11 +35,11 @@ class ApiService {
   }
 
   // PUT Request
-  Future<dynamic> put(String endpoint, Map<String, dynamic> body) async {
+  Future<dynamic> put(String endpoint, Map<String, dynamic> body, {Map<String, String>? headers}) async {
     try {
       final response = await http.put(
         Uri.parse('$baseUrl$endpoint'),
-        headers: {'Content-Type': 'application/json'},
+        headers: headers ?? {'Content-Type': 'application/json'},
         body: jsonEncode(body),
       );
       _debugResponse(response);

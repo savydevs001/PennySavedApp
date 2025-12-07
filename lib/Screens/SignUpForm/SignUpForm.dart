@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:penny/Components/Global/Button.dart';
 import 'package:penny/Components/Global/TextField.dart';
 import 'package:penny/Services/auth_service.dart';
-import 'package:penny/Screens/mainScreen/Screens/homeScreen/HomePage.dart';
+import 'package:penny/Screens/mainScreen/index.dart';
+import 'package:provider/provider.dart';
+import 'package:penny/Providers/app_state.dart';
 
 class SignUpForm extends StatefulWidget {
   const SignUpForm({super.key});
@@ -167,9 +169,11 @@ class _SignUpFormState extends State<SignUpForm> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text("Sign-up Successful!")),
                   );
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => const HomePage()),
+                  final appState = Provider.of<AppState>(context, listen: false);
+                  appState.setAuthToken(token);
+                  await appState.fetchUserProfile();
+                  Navigator.of(context).pushReplacement(
+                    mainScreen.route(initialPage: 0),
                   );
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(

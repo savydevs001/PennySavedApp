@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
@@ -7,10 +8,16 @@ import 'api_service.dart';
 class AuthService {
   final _storage = const FlutterSecureStorage();
   final ApiService _apiService = ApiService(baseUrl: ApiConfig.baseUrl);
+  final StreamController<String?> _tokenController = StreamController<String?>.broadcast();
+
+  Stream<String?> get tokenStream => _tokenController.stream;
 
   // Save token securely
   Future<void> saveToken(String token) async {
     await _storage.write(key: 'auth_token', value: token);
+    try {
+      _tokenController.add(token);
+    } catch (_) {}
   }
 
   // Retrieve token
@@ -21,6 +28,9 @@ class AuthService {
   // Remove token
   Future<void> removeToken() async {
     await _storage.delete(key: 'auth_token');
+    try {
+      _tokenController.add(null);
+    } catch (_) {}
   }
 
   // Login
@@ -40,12 +50,19 @@ class AuthService {
       if (status == 200) {
         // Check if backend requires two-factor authentication
         final twoFactor = body is Map && body['twoFactorRequired'] == true;
+        // detect token if backend returned one
+        String? token;
+        if (body is Map) {
+          token = body['token']?.toString() ?? body['accessToken']?.toString() ?? body['access_token']?.toString();
+        }
+        if (token != null) await saveToken(token);
         return {
           'success': !twoFactor,
           'twoFactorRequired': twoFactor,
           'statusCode': status,
           'message': body['message'] ?? 'Login successful',
           'user': body['user'],
+          'token': token,
         };
       }
 

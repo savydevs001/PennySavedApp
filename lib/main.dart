@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:provider/provider.dart';
 import 'package:penny/Services/auth_service.dart';
-import 'package:penny/Screens/mainScreen/Screens/homeScreen/HomePage.dart';
+import 'package:penny/Providers/app_state.dart';
+import 'package:penny/Screens/mainScreen/index.dart';
 import 'package:penny/Screens/signUp.dart';
 void main() {
   runApp(const MyApp());
@@ -27,32 +29,73 @@ class MyApp extends StatelessWidget {
             ),
           );
         } else if (snapshot.hasData && snapshot.data == true) {
-          return MaterialApp(
-            debugShowCheckedModeBanner: false,
-            title: 'Penny Saved',
-            theme: ThemeData(
-              scaffoldBackgroundColor: const Color.fromRGBO(22, 22, 33, 1),
-              colorScheme: ColorScheme.fromSeed(
-                seedColor: const Color.fromRGBO(22, 22, 33, 1),
-                background: const Color.fromRGBO(22, 22, 33, 1),
+          return ChangeNotifierProvider(
+            create: (_) {
+              final appState = AppState();
+              // seed AppState with stored token and listen for future token changes
+              AuthService().getToken().then((t) {
+                if (t != null) {
+                  appState.setAuthToken(t);
+                  appState.fetchUserProfile();
+                }
+              });
+              AuthService().tokenStream.listen((tok) {
+                if (tok != null) {
+                  appState.setAuthToken(tok);
+                  appState.fetchUserProfile();
+                } else {
+                  appState.setAuthToken('');
+                }
+              });
+              return appState;
+            },
+            child: MaterialApp(
+              debugShowCheckedModeBanner: false,
+              title: 'Penny Saved',
+              theme: ThemeData(
+                scaffoldBackgroundColor: const Color.fromRGBO(22, 22, 33, 1),
+                colorScheme: ColorScheme.fromSeed(
+                  seedColor: const Color.fromRGBO(22, 22, 33, 1),
+                  background: const Color.fromRGBO(22, 22, 33, 1),
+                ),
+                useMaterial3: true,
               ),
-              useMaterial3: true,
+              home: const mainScreen(),
             ),
-            home: const HomePage(),
           );
         } else {
-          return MaterialApp(
-            debugShowCheckedModeBanner: false,
-            title: 'Penny Saved',
-            theme: ThemeData(
-              scaffoldBackgroundColor: const Color.fromRGBO(22, 22, 33, 1),
-              colorScheme: ColorScheme.fromSeed(
-                seedColor: const Color.fromRGBO(22, 22, 33, 1),
-                background: const Color.fromRGBO(22, 22, 33, 1),
+          return ChangeNotifierProvider(
+            create: (_) {
+              final appState = AppState();
+              AuthService().getToken().then((t) {
+                if (t != null) {
+                  appState.setAuthToken(t);
+                  appState.fetchUserProfile();
+                }
+              });
+              AuthService().tokenStream.listen((tok) {
+                if (tok != null) {
+                  appState.setAuthToken(tok);
+                  appState.fetchUserProfile();
+                } else {
+                  appState.setAuthToken('');
+                }
+              });
+              return appState;
+            },
+            child: MaterialApp(
+              debugShowCheckedModeBanner: false,
+              title: 'Penny Saved',
+              theme: ThemeData(
+                scaffoldBackgroundColor: const Color.fromRGBO(22, 22, 33, 1),
+                colorScheme: ColorScheme.fromSeed(
+                  seedColor: const Color.fromRGBO(22, 22, 33, 1),
+                  background: const Color.fromRGBO(22, 22, 33, 1),
+                ),
+                useMaterial3: true,
               ),
-              useMaterial3: true,
+              home: const Signup(),
             ),
-            home: const Signup(),
           );
         }
       },

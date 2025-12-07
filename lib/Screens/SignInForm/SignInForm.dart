@@ -4,8 +4,9 @@ import 'package:penny/Components/Global/TextField.dart';
 import 'package:penny/Screens/ResetPassword.dart';
 import 'package:penny/Screens/OtpForResentPassword.dart';
 import 'package:penny/Services/auth_service.dart';
-import 'package:penny/Screens/mainScreen/Screens/homeScreen/HomePage.dart';
 import 'package:penny/Screens/mainScreen/index.dart';
+import 'package:provider/provider.dart';
+import 'package:penny/Providers/app_state.dart';
 class SignInForm extends StatefulWidget {
   const SignInForm({super.key});
 
@@ -136,13 +137,24 @@ class _SignInFormState extends State<SignInForm> {
               }
 
               if (result['success'] == true) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(message)),
-                );
-                // Navigate to home/dashboard
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const mainScreen()),
+                //print the result of api request
+                print(result.entries);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+
+                // persist token in AppState if provided and fetch profile
+                final token = result['token'] as String?;
+                if (token != null) {
+                  //log the token
+                  print('Auth Token: $token');
+                  
+                  final appState = Provider.of<AppState>(context, listen: false);
+                  appState.setAuthToken(token);
+                  await appState.fetchUserProfile();
+                }
+
+                // Navigate to the full main screen so nav bar and pages are available
+                Navigator.of(context).pushReplacement(
+                  mainScreen.route(initialPage: 0),
                 );
                 return;
               }

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:penny/Providers/app_state.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:penny/Components/Global/logo.dart';
 import 'package:penny/Components/mainScreen/BottomNavigation.dart';
@@ -44,6 +46,12 @@ class _mainScreenState extends State<mainScreen> {
     super.initState();
     _currentnavitem = widget.initialPage;
     pagescontrol = PageController(initialPage: widget.initialPage);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        final appState = Provider.of<AppState>(context, listen: false);
+        appState.fetchUserProfile();
+      } catch (_) {}
+    });
   }
 
   void navigateToPage(int index) {
@@ -59,6 +67,7 @@ class _mainScreenState extends State<mainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isLoading = Provider.of<AppState>(context).isLoadingProfile;
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color.fromRGBO(22, 22, 33, 1),
@@ -187,7 +196,7 @@ class _mainScreenState extends State<mainScreen> {
                         style: TextStyle(color: Colors.white, fontSize: 14),
                       ),
                       onTap: () {
-                        navigateToPage(5);
+                        navigateToPage(4);
                       },
                     ),
                     const Divider(
@@ -282,7 +291,9 @@ class _mainScreenState extends State<mainScreen> {
           ),
         ),
       ),
-      body: PageView(
+      body: Stack(
+        children: [
+          PageView(
           controller: pagescontrol,
           onPageChanged: (index) {
             setState(() {
@@ -290,6 +301,17 @@ class _mainScreenState extends State<mainScreen> {
             });
           },
           children: pages),
+          if (isLoading)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black45,
+                child: const Center(
+                  child: CircularProgressIndicator(),
+                ),
+              ),
+            ),
+        ],
+      ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         selectedFontSize: 13,
