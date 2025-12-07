@@ -14,4 +14,5 @@ class ApiConfig {
   static const String disable2faSend = '/auth/disable-2fa/send-otp';
   static const String enable2faVerify = '/auth/enable-2fa/verify-otp';
   static const String disable2faVerify = '/auth/disable-2fa/verify-otp';
+  static const String contact = '/auth/contact';
 }

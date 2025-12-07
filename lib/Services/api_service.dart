@@ -50,6 +50,18 @@ class ApiService {
     }
   }
 
+  // DELETE Request
+  Future<dynamic> delete(String endpoint, {Map<String, String>? headers}) async {
+    try {
+      final response = await http.delete(Uri.parse('$baseUrl$endpoint'), headers: headers ?? {'Content-Type': 'application/json'});
+      _debugResponse(response);
+      return _handleResponse(response);
+    } catch (e) {
+      print('DELETE request error: $e');
+      rethrow;
+    }
+  }
+
   // Debugging Helper
   void _debugResponse(http.Response response) {
     print('Response Status: ${response.statusCode}');

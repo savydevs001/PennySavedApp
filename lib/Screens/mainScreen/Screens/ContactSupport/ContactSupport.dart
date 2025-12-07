@@ -1,9 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:penny/Screens/mainScreen/Notification/index.dart';
+import '../../../../Services/api_service.dart';
+import '../../../../Utils/api_config.dart';
+import '../../../../Services/auth_service.dart';
+import 'package:provider/provider.dart';
+import '../../../../Providers/app_state.dart';
 
-class ContactSupportScreen extends StatelessWidget {
+class ContactSupportScreen extends StatefulWidget {
   const ContactSupportScreen({super.key});
+
+  @override
+  State<ContactSupportScreen> createState() => _ContactSupportScreenState();
+}
+
+class _ContactSupportScreenState extends State<ContactSupportScreen> {
+  final TextEditingController _messageController = TextEditingController();
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -90,6 +108,7 @@ class ContactSupportScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 TextField(
+                  controller: _messageController,
                   maxLines: 4,
                   style: const TextStyle(
                     color: Colors.white,
@@ -143,7 +162,9 @@ class ContactSupportScreen extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {},
+                    onPressed: () async {
+                      await _submitContact();
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color.fromRGBO(133, 187, 101, 1),
                       padding: const EdgeInsets.symmetric(vertical: 15),
@@ -166,5 +187,36 @@ class ContactSupportScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _submitContact() async {
+    final message = _messageController.text.trim();
+    if (message.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter a message')));
+      return;
+    }
+    try {
+      final api = ApiService(baseUrl: ApiConfig.baseUrl);
+      final token = await AuthService().getToken();
+      Map<String, String> headers = {'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final appState = Provider.of<AppState>(context, listen: false);
+      final userName = ((appState.firstName + ' ' + appState.lastName).trim().isNotEmpty) ? (appState.firstName + ' ' + appState.lastName).trim() : 'Website Visitor';
+      final userEmail = (appState.email.isNotEmpty) ? appState.email : 'visitor@pennysavedllc.com';
+
+      final resp = await api.post(ApiConfig.contact, {
+        'name': userName,
+        'email': userEmail,
+        'message': message
+      }, headers: headers);
+      final msg = (resp is Map && resp['message'] != null) ? resp['message'].toString() : 'Response received';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      if (resp is Map && resp['success'] == true) {
+        _messageController.clear();
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Contact failed: $e')));
+    }
   }
 }

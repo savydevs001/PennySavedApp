@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:penny/Screens/mainScreen/Notification/index.dart';
 import 'package:penny/Screens/mainScreen/Screens/Wallet/PaymentMethods/CardInfo/CardInfo.dart';
+import 'package:penny/Services/api_service.dart';
+import 'package:penny/Utils/api_config.dart';
+import 'package:penny/Services/auth_service.dart';
+import 'dart:async';
 
 class PaymentMethodScreen extends StatefulWidget {
   const PaymentMethodScreen({super.key});
@@ -12,21 +16,42 @@ class PaymentMethodScreen extends StatefulWidget {
 
 class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
   bool isChanged = false; // To track if changes were made
+  List<Map<String, dynamic>> paymentMethods = [];
+  bool _loading = true;
 
-  final List<Map<String, dynamic>> paymentMethods = [
-    {
-      "brand": "Mastercard",
-      "lastFour": "4371",
-      "expiry": "08/28",
-      "isPrimary": true,
-    },
-    {
-      "brand": "Visa",
-      "lastFour": "5137",
-      "expiry": "08/28",
-      "isPrimary": false,
+  @override
+  void initState() {
+    super.initState();
+    _fetchPaymentMethods();
+  }
+
+  Future<void> _fetchPaymentMethods() async {
+    setState(() {
+      _loading = true;
+    });
+    try {
+      final api = ApiService(baseUrl: ApiConfig.baseUrl);
+      final token = await AuthService().getToken();
+      Map<String, String> headers = {'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final resp = await api.get('/payment/saved-methods', headers: headers);
+      if (resp is Map && resp['success'] == true && resp['paymentMethods'] is List) {
+        final list = (resp['paymentMethods'] as List).map((e) => Map<String, dynamic>.from(e)).toList();
+        setState(() {
+          paymentMethods = list;
+        });
+      } else {
+        // leave empty
+      }
+    } catch (e) {
+      print('Error fetching payment methods: $e');
+    } finally {
+      setState(() {
+        _loading = false;
+      });
     }
-  ];
+  }
 
   void _onCardTap(int index) {
     setState(() {
@@ -81,7 +106,9 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ...List.generate(paymentMethods.length, (index) {
+            if (_loading) ...[
+              const Center(child: CircularProgressIndicator()),
+            ] else ...List.generate(paymentMethods.length, (index) {
               final method = paymentMethods[index];
               return GestureDetector(
                 onTap: () {
@@ -108,15 +135,15 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
                                 : Colors.orange,
                           ),
                           const SizedBox(width: 10),
-                          Column(
+                              Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                "XXXX - ${method["lastFour"]}",
+                                "XXXX - ${method["last4"] ?? method["lastFour"]}",
                                 style: const TextStyle(color: Colors.white),
                               ),
                               Text(
-                                "Expires in ${method["expiry"]}",
+                                "Expires in ${method["expMonth"]?.toString().padLeft(2,'0')}/${method["expYear"]?.toString().substring(2) ?? ''}",
                                 style: const TextStyle(color: Colors.grey),
                               ),
                             ],
@@ -125,7 +152,7 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
                       ),
                       Row(
                         children: [
-                          if (method["isPrimary"])
+                          if (method["isPrimary"] ?? false)
                             Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 4),
@@ -139,7 +166,43 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
                               ),
                             ),
                           const SizedBox(width: 10),
-                          const Icon(Icons.more_vert, color: Colors.white),
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.white),
+                            onPressed: () async {
+                              final id = method['_id']?.toString() ?? method['id']?.toString();
+                              if (id == null || id.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid payment method id')));
+                                return;
+                              }
+                              if (paymentMethods.length <= 1) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cannot delete the last payment method')));
+                                return;
+                              }
+                              // call DELETE
+                              try {
+                                final api = ApiService(baseUrl: ApiConfig.baseUrl);
+                                final token = await AuthService().getToken();
+                                Map<String, String> headers = {'Content-Type': 'application/json'};
+                                if (token != null) headers['Authorization'] = 'Bearer $token';
+
+                                final resp = await api.delete('/payment/methods/$id', headers: headers);
+                                final msg = (resp is Map && resp['message'] != null) ? resp['message'].toString() : 'Delete response';
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+                                if (resp is Map && resp['success'] == true) {
+                                  setState(() {
+                                    paymentMethods.removeAt(index);
+                                    isChanged = true;
+                                    // ensure some method is primary
+                                    if (!paymentMethods.any((m) => m['isPrimary'] == true) && paymentMethods.isNotEmpty) {
+                                      paymentMethods[0]['isPrimary'] = true;
+                                    }
+                                  });
+                                }
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Delete failed: $e')));
+                              }
+                            },
+                          ),
                         ],
                       ),
                     ],
