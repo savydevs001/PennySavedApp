@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:penny/Components/Global/TextField.dart';
+import 'package:provider/provider.dart';
+import '../../../../Providers/app_state.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -15,18 +17,18 @@ class _AccountScreenState extends State<AccountScreen> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
 
-  List<String> selectedInvestments = ["Stocks", "Mutual Funds", "Index Funds"];
-  List<String> availableInvestments = [
-    "Stocks",
-    "Mutual Funds",
-    "Index Funds",
-    "Bonds",
-    "ETFs"
-  ];
-  String selectedRiskLevel = "Low Risk";
+  // Only these three options are allowed per spec
+  List<String> availableInvestments = ["SPY", "QQQ", "GLD"];
+  List<String> selectedInvestments = [];
+  // Risk level removed per request
+  bool _isDirty = false;
+  bool _initialized = false;
+  String? _currentCountryCode;
+  String? _initialFullPhone;
 
   @override
   Widget build(BuildContext context) {
+    final appState = Provider.of<AppState>(context);
     return Scaffold(
       backgroundColor: const Color.fromRGBO(22, 22, 33, 1), // Dark Background
 
@@ -58,7 +60,7 @@ class _AccountScreenState extends State<AccountScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _sectionTitle("Personal Information"),
-                        _inputFields(),
+                        _inputFields(appState),
 
                         const SizedBox(height: 20),
 
@@ -74,25 +76,12 @@ class _AccountScreenState extends State<AccountScreen> {
                         const SizedBox(height: 8),
                         _investmentSelection(),
                         _SubDessectionTitle(
-                            "Select the investment types you'd like Penny Saved to manage for you."),
+                          "Select the investment types you'd like Penny Saved to manage for you."),
 
-                        const SizedBox(height: 20),
-
-                        // Risk Level Dropdown
-                        const Text("Risk Level",
-                            style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w400)),
-                        const SizedBox(height: 8),
-
-                        _riskLevelDropdown(),
-                        _SubDessectionTitle(
-                            "Low risk let penny saved invest only in mutual funds and safe investments."),
                         const SizedBox(height: 20),
 
                         // Save Button
-                        _saveButton(),
+                        _saveButton(appState),
                       ],
                     ),
                   )),
@@ -142,7 +131,24 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   // Personal Information Inputs
-  Widget _inputFields() {
+  Widget _inputFields(AppState appState) {
+    // initialize controllers once
+    if (!_initialized) {
+      firstNameController.text = appState.firstName;
+      lastNameController.text = appState.lastName;
+      emailController.text = appState.email;
+      final norm = _normalizePhone(appState.userProfile?['phoneNumber']?.toString() ?? '');
+      _initialFullPhone = norm;
+      // if normalized has leading +, remove it for the text field because IntlPhoneField manages country code
+      phoneController.text = (norm.startsWith('+')) ? norm.substring(1) : norm;
+      // load investments from preferences if available
+      try {
+        final inv = appState.preferences['investmentType'];
+        if (inv is List) selectedInvestments = inv.map((e) => e.toString()).where((s) => availableInvestments.contains(s)).toList();
+      } catch (_) {}
+      _initialized = true;
+    }
+
     return Container(
       padding: const EdgeInsets.all(0),
       decoration: BoxDecoration(
@@ -165,10 +171,11 @@ class _AccountScreenState extends State<AccountScreen> {
                               color: Colors.white,
                               fontWeight: FontWeight.w400)),
                     ),
-                    CustomTextField(
-                      controller: firstNameController,
-                      hintText: 'First Name',
-                    ),
+                      CustomTextField(
+                        controller: firstNameController,
+                        hintText: 'First Name',
+                        onChanged: (_) => _onChanged(),
+                      ),
                   ],
                 ),
               ),
@@ -185,10 +192,11 @@ class _AccountScreenState extends State<AccountScreen> {
                               color: Colors.white,
                               fontWeight: FontWeight.w400)),
                     ),
-                    CustomTextField(
-                      controller: lastNameController,
-                      hintText: "Last Name",
-                    ),
+                      CustomTextField(
+                        controller: lastNameController,
+                        hintText: "Last Name",
+                        onChanged: (_) => _onChanged(),
+                      ),
                   ],
                 ),
               ),
@@ -207,10 +215,11 @@ class _AccountScreenState extends State<AccountScreen> {
                         color: Colors.white,
                         fontWeight: FontWeight.w400)),
               ),
-              CustomTextField(
-                controller: lastNameController,
-                hintText: "Email Address",
-              ),
+                CustomTextField(
+                  controller: emailController,
+                  hintText: "Email Address",
+                  onChanged: (_) => _onChanged(),
+                ),
             ],
           ),
           const SizedBox(height: 12),
@@ -233,6 +242,12 @@ class _AccountScreenState extends State<AccountScreen> {
               initialCountryCode: 'US',
               style: const TextStyle(color: Colors.white),
               dropdownTextStyle: const TextStyle(color: Colors.white),
+              onChanged: (v) {
+                // keep the selected country code (e.g. +1) and set controller to national number
+                _currentCountryCode = v.countryCode;
+                phoneController.text = v.number ?? '';
+                _onChanged();
+              },
             ),
           ),
         ],
@@ -256,19 +271,26 @@ class _AccountScreenState extends State<AccountScreen> {
         children: [
           Wrap(
             spacing: 8.0,
-            children: selectedInvestments
-                .map((investment) => Chip(
-                      label: Text(investment,
-                          style: const TextStyle(color: Colors.white)),
-                      backgroundColor: const Color.fromRGBO(128, 131, 144, 0.9),
-                      deleteIcon: const Icon(Icons.close, color: Colors.white),
-                      onDeleted: () {
-                        setState(() {
-                          selectedInvestments.remove(investment);
-                        });
-                      },
-                    ))
-                .toList(),
+            children: availableInvestments.map((investment) {
+              final selected = selectedInvestments.contains(investment);
+              return FilterChip(
+                label: Text(investment, style: const TextStyle(color: Colors.white)),
+                selected: selected,
+                selectedColor: const Color.fromRGBO(133, 187, 101, 1),
+                checkmarkColor: Colors.black,
+                backgroundColor: const Color.fromRGBO(47, 43, 61, 0.6),
+                onSelected: (v) {
+                  setState(() {
+                    if (v) {
+                      if (!selectedInvestments.contains(investment)) selectedInvestments.add(investment);
+                    } else {
+                      selectedInvestments.remove(investment);
+                    }
+                    _onChanged();
+                  });
+                },
+              );
+            }).toList(),
           ),
           const SizedBox(height: 8),
           Row(
@@ -325,52 +347,69 @@ class _AccountScreenState extends State<AccountScreen> {
     );
   }
 
-  // Risk Level Dropdown
-  Widget _riskLevelDropdown() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-          color: const Color.fromRGBO(36, 36, 51, 1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.white,
-            width: 1,
-          )),
-      child: DropdownButton<String>(
-        value: selectedRiskLevel,
-        dropdownColor: const Color.fromRGBO(36, 36, 51, 1),
-        style: const TextStyle(color: Colors.white),
-        underline: Container(),
-        isExpanded: true,
-        items: ["Low Risk", "Medium Risk", "High Risk"]
-            .map((risk) => DropdownMenuItem(
-                  value: risk,
-                  child:
-                      Text(risk, style: const TextStyle(color: Colors.white)),
-                ))
-            .toList(),
-        onChanged: (value) {
-          setState(() {
-            selectedRiskLevel = value!;
-          });
-        },
+  // risk level removed — no widget
+
+  String _normalizePhone(String raw) {
+    if (raw == null) return '';
+    String s = raw.toString();
+    // keep leading + if present, remove everything else except digits
+    final hasPlus = s.contains('+');
+    final digits = s.replaceAll(RegExp(r'[^0-9]'), '');
+    // limit to max 15 digits (E.164 max length without +)
+    String trimmed = digits;
+    if (trimmed.length > 15) trimmed = trimmed.substring(trimmed.length - 15);
+    if (trimmed.isEmpty) return '';
+    return hasPlus ? '+$trimmed' : '+$trimmed';
+  }
+
+  // Save Button
+  Widget _saveButton(AppState appState) {
+    final canSave = _isDirty && selectedInvestments.isNotEmpty;
+    return ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: canSave ? const Color.fromRGBO(133, 187, 101, 1) : const Color.fromRGBO(96, 98, 108, 1),
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+      ),
+      onPressed: canSave
+          ? () async {
+              final payload = {
+                'firstName': firstNameController.text.trim(),
+                'lastName': lastNameController.text.trim(),
+                'email': emailController.text.trim(),
+                'phoneNumber': phoneController.text.trim(),
+                'preferences': {'investmentType': selectedInvestments}
+              };
+              try {
+                await appState.updateUserProfile(payload);
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile saved')));
+                setState(() {
+                  _isDirty = false;
+                });
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Save failed: $e')));
+              }
+            }
+          : null,
+      child: Center(
+        child: Text("Save", style: const TextStyle(color: Colors.white, fontSize: 16)),
       ),
     );
   }
 
-  // Save Button
-  Widget _saveButton() {
-    return ElevatedButton(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color.fromRGBO(96, 98, 108, 1),
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-      ),
-      onPressed: () {},
-      child: const Center(
-        child:
-            Text("Save", style: TextStyle(color: Colors.white, fontSize: 16)),
-      ),
-    );
+  void _onChanged() {
+    // mark dirty whenever a field differs from AppState values (simple heuristic)
+    setState(() {
+      _isDirty = true;
+    });
+  }
+
+  @override
+  void dispose() {
+    firstNameController.dispose();
+    lastNameController.dispose();
+    emailController.dispose();
+    phoneController.dispose();
+    super.dispose();
   }
 }

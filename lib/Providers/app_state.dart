@@ -181,8 +181,15 @@ class AppState extends ChangeNotifier {
 
   // Update user profile
   Future<void> updateUserProfile(Map<String, dynamic> updatedData) async {
+    _isLoadingProfile = true;
+    notifyListeners();
     try {
-      final response = await _apiService.put(ApiConfig.updateUser, updatedData);
+      final token = await AuthService().getToken();
+      Map<String, String> headers = {'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final response = await _apiService.put(ApiConfig.userProfile, updatedData, headers: headers);
+
       // backend may return { success: true, user: { ... } }
       if (response is Map && response.containsKey('user')) {
         setUserProfile(response['user']);
@@ -191,6 +198,10 @@ class AppState extends ChangeNotifier {
       }
     } catch (e) {
       print('Error updating user profile: $e');
+      rethrow;
+    } finally {
+      _isLoadingProfile = false;
+      notifyListeners();
     }
   }
 }

@@ -9,4 +9,5 @@ class ApiConfig {
   static const String fetchData = '/data';
   static const String sendOtp = '/auth/send-otp';
   static const String verifyOtp = '/auth/verify-otp';
+  static const String updatePassword = '/auth/update-password';
 }

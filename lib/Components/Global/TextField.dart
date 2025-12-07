@@ -6,6 +6,7 @@ class CustomTextField extends StatelessWidget {
   final bool isPassword;
   final TextEditingController? controller; // Kept optional
   final String? Function(String?)? validator;
+  final void Function(String)? onChanged;
   final Widget? suffixIcon;
 
   const CustomTextField({
@@ -15,6 +16,7 @@ class CustomTextField extends StatelessWidget {
     this.controller, // Now optional
     this.isPassword = false,
     this.validator,
+    this.onChanged,
     this.suffixIcon,
   });
 
@@ -25,6 +27,7 @@ class CustomTextField extends StatelessWidget {
       child: TextFormField(
         controller: controller, // It will be null if not provided
         validator: validator,
+        onChanged: onChanged,
         obscureText: isPassword,
         style: const TextStyle(color: Colors.white),
         decoration: InputDecoration(
