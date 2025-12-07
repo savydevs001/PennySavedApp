@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:penny/Components/Global/TextField.dart';
 import 'package:penny/Screens/mainScreen/Notification/index.dart';
 import 'package:penny/Screens/mainScreen/Screens/Enable2FA/Enable2FAPhone/2FAPhone.dart';
+import 'package:provider/provider.dart';
+import '../../../../Providers/app_state.dart';
 import '../../../../Services/api_service.dart';
 import '../../../../Utils/api_config.dart';
 import '../../../../Services/auth_service.dart';
@@ -192,34 +195,164 @@ class _SecurityScreenState extends State<SecurityScreen> {
             style: TextStyle(color: Colors.white70)),
         const SizedBox(height: 8),
         ElevatedButton(
-          onPressed: () {
-            ConfirmationDialog.showConfirmationDialog(
-              context: context,
-              isPhoneSelected: isPhoneSelected,
-              onToggle: (bool value) {
-                setState(() {
-                  isPhoneSelected = value;
-                });
-              },
-              emailController: emailController,
-              phoneController: phoneController,
-            );
-
-            // Handle withdrawal
+          onPressed: () async {
+            final appState = Provider.of<AppState>(context, listen: false);
+            final isEnabled = appState.twoFactorEnabled;
+            await _send2faOtp(isEnabled);
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color.fromRGBO(133, 187, 101, 1),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
           ),
-          child: const Text("Enable 2FA",
-              style: TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.w500,
-                  fontSize: 14)),
+          child: Consumer<AppState>(builder: (context, appState, _) {
+            final enabled = appState.twoFactorEnabled;
+            return Text(enabled ? "Disable 2FA" : "Enable 2FA",
+                style: const TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14));
+          }),
         ),
       ],
     );
+  }
+
+  Future<void> _send2faOtp(bool currentlyEnabled) async {
+    final api = ApiService(baseUrl: ApiConfig.baseUrl);
+    final token = await AuthService().getToken();
+    Map<String, String> headers = {'Content-Type': 'application/json'};
+    if (token != null) headers['Authorization'] = 'Bearer $token';
+
+    final endpoint = currentlyEnabled ? ApiConfig.disable2faSend : ApiConfig.enable2faSend;
+    try {
+      final resp = await api.post(endpoint, {}, headers: headers);
+      if (resp is Map && resp['success'] == true && resp['message'] != null && resp['message'].toString().toLowerCase().contains('otp sent')) {
+        // show OTP entry dialog
+        _showOtpDialog(currentlyEnabled);
+      } else {
+        final msg = (resp is Map && resp['message'] != null) ? resp['message'].toString() : 'Failed to send OTP';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Send OTP failed: $e')));
+    }
+  }
+
+  void _showOtpDialog(bool currentlyEnabled) {
+    String otp = '';
+    int seconds = 60;
+    Timer? timer;
+
+    void startTimer(StateSetter setState) {
+      timer?.cancel();
+      seconds = 60;
+      timer = Timer.periodic(const Duration(seconds: 1), (t) {
+        setState(() {
+          seconds -= 1;
+          if (seconds <= 0) {
+            timer?.cancel();
+          }
+        });
+      });
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(builder: (context, setState) {
+          // start the countdown once using the dialog's setState so UI updates
+          bool _started = false;
+          if (!_started) {
+            _started = true;
+            startTimer(setState);
+          }
+          return AlertDialog(
+            backgroundColor: const Color.fromRGBO(36, 36, 51, 1),
+            title: Text(currentlyEnabled ? 'Disable 2FA — enter OTP' : 'Enable 2FA — enter OTP', style: const TextStyle(color: Colors.white)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Enter the 6-digit OTP', style: TextStyle(color: Colors.white70)),
+                const SizedBox(height: 12),
+                TextField(
+                  autofocus: true,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(counterText: ''),
+                  onChanged: (v) {
+                    setState(() {
+                      otp = v.trim();
+                    });
+                  },
+                ),
+                const SizedBox(height: 8),
+                seconds > 0
+                    ? Text('Resend in ${seconds}s', style: const TextStyle(color: Colors.white54))
+                    : TextButton(
+                        onPressed: () async {
+                          // resend
+                          setState(() {
+                            seconds = 60;
+                          });
+                          startTimer(setState);
+                          await _send2faOtp(currentlyEnabled);
+                        },
+                        child: const Text('Resend', style: TextStyle(color: Colors.white)),
+                      )
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  timer?.cancel();
+                  Navigator.pop(context);
+                },
+                child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+              ),
+              ElevatedButton(
+                onPressed: otp.length == 6
+                    ? () async {
+                        timer?.cancel();
+                        Navigator.pop(context);
+                        await _verify2faOtp(currentlyEnabled, otp);
+                      }
+                    : null,
+                child: const Text('Verify'),
+              ),
+            ],
+          );
+        });
+      },
+    ).then((_) {
+      // ensure timer is cancelled when dialog closes
+      try {
+        // timer is in outer scope; cancel if active
+        timer?.cancel();
+      } catch (_) {}
+    });
+  }
+
+  Future<void> _verify2faOtp(bool currentlyEnabled, String otp) async {
+    final api = ApiService(baseUrl: ApiConfig.baseUrl);
+    final token = await AuthService().getToken();
+    Map<String, String> headers = {'Content-Type': 'application/json'};
+    if (token != null) headers['Authorization'] = 'Bearer $token';
+    final endpoint = currentlyEnabled ? ApiConfig.disable2faVerify : ApiConfig.enable2faVerify;
+    try {
+      final resp = await api.post(endpoint, {'otp': otp}, headers: headers);
+      final msg = (resp is Map && resp['message'] != null) ? resp['message'].toString() : 'Verification failed';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      if (resp is Map && resp['success'] == true) {
+        // refresh profile
+        final appState = Provider.of<AppState>(context, listen: false);
+        await appState.fetchUserProfile();
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Verification error: $e')));
+    }
   }
 
   Widget _buildSaveButton() {
