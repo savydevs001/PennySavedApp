@@ -91,7 +91,7 @@ class _OtpFormState extends State<OtpForm> {
                       fontFamily: 'poppins',
                       fontWeight: FontWeight.w400,
                     ),
-                    numberOfFields: 5,
+                    numberOfFields: 6,
                     borderWidth: 1,
                     fieldHeight: 49,
                     autoFocus: false,

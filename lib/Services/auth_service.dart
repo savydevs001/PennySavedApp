@@ -135,12 +135,17 @@ class AuthService {
   // Verify OTP - returns true if OTP valid
   Future<bool> verifyOtp(String email, String code, {String purpose = 'login'}) async {
     try {
-      final response = await _apiService.post(ApiConfig.verifyOtp, {
+      print('Verifying OTP for $email with code $code for purpose $purpose');
+      final response = await _apiService.post(purpose == 'login' ? ApiConfig.verifyLoginOtp : ApiConfig.verifyOtp, {
         'email': email,
-        'code': code,
+        'otp': code,
         'purpose': purpose,
       });
-      if (response is Map && (response['valid'] == true || response['success'] == true)) {
+      if (response is Map && (response['valid'] == true || response['success'] == true && response.containsKey('token'))) {
+        if (response.containsKey('token')) {
+          final token = response['token'];
+          await saveToken(token);
+        }
         return true;
       }
       return false;
