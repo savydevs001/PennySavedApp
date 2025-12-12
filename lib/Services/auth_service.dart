@@ -10,6 +10,10 @@ class AuthService {
   final ApiService _apiService = ApiService(baseUrl: ApiConfig.baseUrl);
   final StreamController<String?> _tokenController = StreamController<String?>.broadcast();
 
+  AuthService() {
+    ApiService.tokenProvider = getToken;
+  }
+
   Stream<String?> get tokenStream => _tokenController.stream;
 
   // Save token securely

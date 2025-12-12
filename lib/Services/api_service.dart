@@ -3,13 +3,31 @@ import 'package:http/http.dart' as http;
 
 class ApiService {
   final String baseUrl;
+  /// Optional token provider callback. Set by AuthService to automatically add Authorization header.
+  static Future<String?> Function()? tokenProvider;
 
   ApiService({required this.baseUrl});
+
+  Future<Map<String, String>> _buildHeaders(Map<String, String>? headers) async {
+    final Map<String, String> h = headers != null ? Map.from(headers) : {'Content-Type': 'application/json'};
+    if (!h.containsKey('Authorization') && tokenProvider != null) {
+      try {
+        final token = await tokenProvider!();
+        if (token != null && token.isNotEmpty) {
+          h['Authorization'] = 'Bearer $token';
+        }
+      } catch (e) {
+        // ignore token provider failure; continue without Authorization header
+      }
+    }
+    return h;
+  }
 
   // GET Request
   Future<dynamic> get(String endpoint, {Map<String, String>? headers}) async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl$endpoint'), headers: headers);
+      final builtHeaders = await _buildHeaders(headers);
+      final response = await http.get(Uri.parse('$baseUrl$endpoint'), headers: builtHeaders);
       _debugResponse(response);
       return _handleResponse(response);
     } catch (e) {
@@ -21,9 +39,10 @@ class ApiService {
   // POST Request
   Future<dynamic> post(String endpoint, Map<String, dynamic> body, {Map<String, String>? headers}) async {
     try {
+      final builtHeaders = await _buildHeaders(headers);
       final response = await http.post(
         Uri.parse('$baseUrl$endpoint'),
-        headers: headers ?? {'Content-Type': 'application/json'},
+        headers: builtHeaders,
         body: jsonEncode(body),
       );
       _debugResponse(response);
@@ -37,9 +56,10 @@ class ApiService {
   // PUT Request
   Future<dynamic> put(String endpoint, Map<String, dynamic> body, {Map<String, String>? headers}) async {
     try {
+      final builtHeaders = await _buildHeaders(headers);
       final response = await http.put(
         Uri.parse('$baseUrl$endpoint'),
-        headers: headers ?? {'Content-Type': 'application/json'},
+        headers: builtHeaders,
         body: jsonEncode(body),
       );
       _debugResponse(response);
@@ -53,7 +73,8 @@ class ApiService {
   // DELETE Request
   Future<dynamic> delete(String endpoint, {Map<String, String>? headers}) async {
     try {
-      final response = await http.delete(Uri.parse('$baseUrl$endpoint'), headers: headers ?? {'Content-Type': 'application/json'});
+      final builtHeaders = await _buildHeaders(headers);
+      final response = await http.delete(Uri.parse('$baseUrl$endpoint'), headers: builtHeaders);
       _debugResponse(response);
       return _handleResponse(response);
     } catch (e) {
