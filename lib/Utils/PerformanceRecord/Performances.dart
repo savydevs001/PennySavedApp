@@ -143,7 +143,7 @@ Widget _buildInvestPopup(BuildContext context) {
     final percentFormatter = NumberFormat('##0.00');
 
     return Container(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(5.0),
       decoration: BoxDecoration(
         color: const Color.fromRGBO(47, 43, 61, 1),
         borderRadius: BorderRadius.circular(12),
@@ -199,13 +199,6 @@ Widget _buildInvestPopup(BuildContext context) {
                                 builder: (context) => _buildInvestPopup(context),
                               );
 
-
-                              
-
-
-
-
-
                               //ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invest & Earn pressed')));
                             },
                             onTap: () {
@@ -234,8 +227,6 @@ Widget _buildInvestPopup(BuildContext context) {
                     ),
                   ],
                 ),
-          const SizedBox(height: 16),
-          const SizedBox(height: 12),
           // Keep list if desired
           const SizedBox(height: 12),
         ],
