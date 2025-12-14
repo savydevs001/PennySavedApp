@@ -7,6 +7,7 @@ import 'package:penny/Screens/mainScreen/Screens/Wallet/AddFunds/ConfirmFund/Con
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:penny/Services/api_service.dart';
 import 'package:penny/Utils/api_config.dart';
+import 'package:penny/Services/auth_service.dart';
 
 class AddFundsScreen extends StatefulWidget {
   const AddFundsScreen({super.key});
@@ -24,7 +25,153 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
   TextEditingController endDateController =
       TextEditingController(text: "Dec 9, 2026");
 
+  // Payment methods fetched from API
+  List<Map<String, dynamic>> paymentMethods = [];
+  bool _loadingMethods = true;
+  String? selectedPaymentMethodId;
+  bool _depositing = false;
   String selectedPaymentMethod = "****1234 Debit Card";
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchPaymentMethods();
+  }
+
+  Future<void> _fetchPaymentMethods() async {
+    setState(() {
+      _loadingMethods = true;
+    });
+    try {
+      final api = ApiService(baseUrl: ApiConfig.baseUrl);
+      final token = await AuthService().getToken();
+      Map<String, String> headers = {'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final resp = await api.get('/payment/saved-methods', headers: headers);
+      if (resp is Map && resp['success'] == true && resp['paymentMethods'] is List) {
+        final list = (resp['paymentMethods'] as List).map((e) => Map<String, dynamic>.from(e)).toList();
+        setState(() {
+          paymentMethods = list;
+          if (paymentMethods.isNotEmpty && selectedPaymentMethodId == null) {
+            selectedPaymentMethodId = (paymentMethods.first['stripePaymentMethodId']?.toString() ?? paymentMethods.first['_id']?.toString() ?? paymentMethods.first['id']?.toString());
+          }
+        });
+      }
+    } catch (e) {
+      print('Error fetching payment methods: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingMethods = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _submitDeposit() async {
+    if (_depositing) return;
+    final int amount = int.tryParse(amountController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    if (amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid amount')));
+      return;
+    }
+    if (selectedPaymentMethodId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select a payment method')));
+      return;
+    }
+
+    setState(() {
+      _depositing = true;
+    });
+
+    try {
+      final api = ApiService(baseUrl: ApiConfig.baseUrl);
+      final token = await AuthService().getToken();
+      Map<String, String> headers = {'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final resp = await api.post('/payment/deposit', {
+        'amount': amount,
+        'paymentMethodId': selectedPaymentMethodId,
+      }, headers: headers);
+
+      print('Deposit response: $resp');
+
+      if (resp is Map && resp['success'] == true) {
+        final msg = resp['message']?.toString() ?? 'Deposit initiated';
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      } else {
+        final err = (resp is Map && resp['message'] != null) ? resp['message'].toString() : 'Deposit failed';
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+      }
+    } catch (e) {
+      print('Error submitting deposit: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _depositing = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _submitRecurring() async {
+    if (_depositing) return;
+    final int amount = int.tryParse(amountController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    if (amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid amount')));
+      return;
+    }
+    if (selectedPaymentMethodId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select a payment method')));
+      return;
+    }
+    final interval = (selectedFrequency ?? 'Monthly').toLowerCase();
+
+    setState(() {
+      _depositing = true;
+    });
+
+    try {
+      final api = ApiService(baseUrl: ApiConfig.baseUrl);
+      final token = await AuthService().getToken();
+      Map<String, String> headers = {'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final resp = await api.post('/payment/recurring', {
+        'amount': amount,
+        'interval': interval,
+        'paymentMethodId': selectedPaymentMethodId,
+      }, headers: headers);
+
+      print('Recurring response: $resp');
+
+      if (resp is Map && resp['success'] == true) {
+        final msg = resp['message']?.toString() ?? 'Subscription created';
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      } else {
+        final err = (resp is Map && resp['message'] != null) ? resp['message'].toString() : 'Recurring creation failed';
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+      }
+    } catch (e) {
+      print('Error creating recurring subscription: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _depositing = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -191,40 +338,61 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
                           fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
 
-                  DropdownButtonFormField<String>(
-                    value: selectedPaymentMethod,
-                    dropdownColor: const Color(0xFF1E1E26),
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: const Color(0xFF1E1E26),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: const BorderSide(color: Colors.white24),
-                        borderRadius: BorderRadius.circular(10),
+                  // Payment Methods (fetched)
+                  if (_loadingMethods) ...[
+                    const Center(child: CircularProgressIndicator()),
+                  ] else ...[
+                    if (paymentMethods.isNotEmpty)
+                      Column(
+                        children: paymentMethods.map((method) {
+                          final id = (method['stripePaymentMethodId']?.toString() ?? method['_id']?.toString() ?? method['id']?.toString());
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                selectedPaymentMethodId = id;
+                              });
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: selectedPaymentMethodId == id ? const Color(0xFF84C67F) : const Color(0xFF2F2B3D),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.credit_card, color: Colors.white),
+                                      const SizedBox(width: 10),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text("XXXX - ${method["last4"] ?? method["lastFour"]}", style: const TextStyle(color: Colors.white)),
+                                          Text("${method["brand"] ?? ''}", style: const TextStyle(color: Colors.grey)),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  if (selectedPaymentMethodId == id)
+                                    const Icon(Icons.check, color: Colors.white)
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2F2B3D),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Text('No payment method added', style: TextStyle(color: Colors.white60)),
                       ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide:
-                            const BorderSide(color: Colors.blue, width: 2),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    icon: const Icon(Icons.keyboard_arrow_down,
-                        color: Colors.white),
-                    style: const TextStyle(color: Colors.white),
-                    items: [
-                      "****1234 Debit Card",
-                      "****1234 Bank Account",
-                    ]
-                        .map((method) => DropdownMenuItem<String>(
-                              value: method,
-                              child: Text(method),
-                            ))
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        selectedPaymentMethod = value!;
-                      });
-                    },
-                  ),
+                  ],
                   const SizedBox(height: 8),
 
                   // Add New Payment Method
@@ -287,12 +455,12 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
                                           print(
                                               'Payment Method created: $paymentMethod');
                                           // Send PaymentMethod ID to backend
-                                          final ApiService _apiService =
+                                          final ApiService _api_service =
                                               ApiService(
                                                   baseUrl: ApiConfig.baseUrl);
                                           try {
                                             final response =
-                                                await _apiService.post(
+                                                await _api_service.post(
                                               "/payment/save-card", // relative endpoint
                                               {
                                                 "paymentMethodId":
@@ -310,6 +478,8 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
                                                     content: Text(
                                                         'Card added successfully')),
                                               );
+                                              // refresh methods
+                                              _fetchPaymentMethods();
                                             } else {
                                               print(
                                                   "Failed to save card: $response");
@@ -355,116 +525,135 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Title
-                        const Text(
-                          "Recurring Top Up",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-
-                        // Toggle Switch
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment
-                              .start, // Align items at the top
-                          children: [
-                            const Expanded(
-                              child: Text(
-                                "Would you like to make this a recurring contribution?",
-                                style: TextStyle(
-                                    color: Colors.white70, fontSize: 14),
+                                            // Toggle Switch
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment
+                                .start, // Align items at the top
+                            children: [
+                              const Expanded(
+                                child: Text(
+                                  "Would you like to make this a recurring contribution?",
+                                  style: TextStyle(
+                                      color: Colors.white70, fontSize: 14),
+                                ),
                               ),
-                            ),
-                            Switch(
-                              value: isRecurring,
-                              onChanged: (value) {
-                                setState(() {
-                                  isRecurring = value;
-                                });
-                              },
-                              activeColor:
-                                  const Color.fromRGBO(133, 187, 101, 1),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-
-                        // Funding Frequency & Amount
-                        Row(
-                          children: [
-                            Expanded(
-                              child: DropdownButtonFormField<String>(
-                                value: selectedFrequency,
-                                dropdownColor: Colors.black,
-                                items: ["Daily", "Weekly", "Monthly", "Yearly"]
-                                    .map((freq) => DropdownMenuItem(
-                                          value: freq,
-                                          child: Text(freq,
-                                              style: const TextStyle(
-                                                  color: Colors.white)),
-                                        ))
-                                    .toList(),
+                              Switch(
+                                value: isRecurring,
                                 onChanged: (value) {
                                   setState(() {
-                                    selectedFrequency = value;
+                                    isRecurring = value;
                                   });
                                 },
-                                decoration:
-                                    _inputDecoration("Funding Frequency"),
+                                activeColor:
+                                    const Color.fromRGBO(133, 187, 101, 1),
                               ),
+                            ],
+                          ),
+
+                  if (isRecurring) ...[
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Title
+                          const Text(
+                            "Recurring Top Up",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
                             ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: TextFormField(
-                                controller: amountController,
-                                style: const TextStyle(color: Colors.white),
-                                decoration: _inputDecoration("Amount"),
-                                keyboardType: TextInputType.number,
+                          ),
+                          const SizedBox(height: 5),
+
+                          // Show details only when a valid amount is entered
+                          Builder(builder: (context) {
+                            final int recurringAmount = int.tryParse(amountController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+                            if (recurringAmount > 0) {
+                              return Column(
+                                children: [
+                                  // Funding Frequency & Amount
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: DropdownButtonFormField<String>(
+                                          value: selectedFrequency,
+                                          dropdownColor: Colors.black,
+                                          items: ["Daily", "Weekly", "Monthly", "Yearly"]
+                                              .map((freq) => DropdownMenuItem(
+                                                    value: freq,
+                                                    child: Text(freq,
+                                                        style: const TextStyle(
+                                                            color: Colors.white)),
+                                                  ))
+                                              .toList(),
+                                          onChanged: (value) {
+                                            setState(() {
+                                              selectedFrequency = value;
+                                            });
+                                          },
+                                          decoration:
+                                              _inputDecoration("Funding Frequency"),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: TextFormField(
+                                          controller: amountController,
+                                          style: const TextStyle(color: Colors.white),
+                                          decoration: _inputDecoration("Amount"),
+                                          keyboardType: TextInputType.number,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+
+                                  // Start Date
+                                  TextFormField(
+                                    controller: startDateController,
+                                    readOnly: true,
+                                    style: const TextStyle(color: Colors.white),
+                                    decoration:
+                                        _dateInputDecoration("Start Date (Optional)"),
+                                    onTap: () =>
+                                        _selectDate(context, startDateController),
+                                  ),
+                                  const SizedBox(height: 10),
+
+                                  // End Date
+                                  TextFormField(
+                                    controller: endDateController,
+                                    readOnly: true,
+                                    style: const TextStyle(color: Colors.white),
+                                    decoration:
+                                        _dateInputDecoration("End Date (Optional)"),
+                                    onTap: () => _selectDate(context, endDateController),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  const Divider(
+                                    color: Color.fromRGBO(154, 146, 184, 0.52),
+                                  ),
+                                ],
+                              );
+                            }
+
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8.0),
+                              child: Text(
+                                'Enter a valid amount to configure recurring top-up',
+                                style: TextStyle(color: Colors.white70),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-
-                        // Start Date
-                        TextFormField(
-                          controller: startDateController,
-                          readOnly: true,
-                          style: const TextStyle(color: Colors.white),
-                          decoration:
-                              _dateInputDecoration("Start Date (Optional)"),
-                          onTap: () =>
-                              _selectDate(context, startDateController),
-                        ),
-                        const SizedBox(height: 10),
-
-                        // End Date
-                        TextFormField(
-                          controller: endDateController,
-                          readOnly: true,
-                          style: const TextStyle(color: Colors.white),
-                          decoration:
-                              _dateInputDecoration("End Date (Optional)"),
-                          onTap: () => _selectDate(context, endDateController),
-                        ),
-                        const SizedBox(height: 20),
-                        const Divider(
-                          color: Color.fromRGBO(154, 146, 184, 0.52),
-                        ),
-                      ],
+                            );
+                          }),
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                   const SizedBox(height: 24),
 
-                  // Withdrawal Details
+                  // Deposit Details
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -473,51 +662,64 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text("Deposite Details",
+                        const Text("Deposit Details",
                             style: TextStyle(
                                 fontSize: 16,
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
                         const Text(
-                            "You're about to confirm your withdrawal, please review data below.",
+                            "You're about to confirm your deposit, please review data below.",
                             style:
                                 TextStyle(color: Colors.white60, fontSize: 14)),
                         const SizedBox(height: 12),
                         _buildDetailRow(
-                            "Payment Method", selectedPaymentMethod),
-                        _buildDetailRow("Withdrawal Amount", "\$2,450"),
-                        _buildDetailRow("Fees", "\$2"),
-                        _buildDetailRow("Total Amount", "\$2,448"),
+                            "Payment Method", selectedPaymentMethodId != null ? 'XXXX - ${paymentMethods.firstWhere((m) => ((m['stripePaymentMethodId']?.toString() ?? m['_id']?.toString() ?? m['id']?.toString())) == selectedPaymentMethodId)['last4'] ?? ''}' : selectedPaymentMethod),
+                        _buildDetailRow("Deposit Amount", amountController.text),
+                        _buildDetailRow("Fees", "\$0"),
+                        _buildDetailRow("Total Amount", amountController.text),
                       ],
                     ),
                   ),
                   const SizedBox(height: 20),
 
-                  // Withdraw Button
+                  // Deposit Button
                   SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => FundConfirmScreen()),
-                        );
-                      }, // Handle withdrawal
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color.fromRGBO(133, 187, 101, 1),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(25),
+                    child: Builder(builder: (context) {
+                      return ElevatedButton(
+                        onPressed: (_depositing)
+                            ? null
+                            : () async {
+                                if (isRecurring) {
+                                  await _submitRecurring();
+                                } else {
+                                  await _submitDeposit();
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _depositing ? Colors.grey : const Color.fromRGBO(133, 187, 101, 1),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(25),
+                          ),
                         ),
-                      ),
-                      child: const Text("Deposite",
-                          style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.black,
-                              fontWeight: FontWeight.bold)),
-                    ),
+                        child: _depositing
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.black,
+                                ),
+                              )
+                            : Text(isRecurring ? 'Start Recurring' : 'Deposit',
+                                style: const TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.bold)),
+                      );
+                    }),
                   ),
                 ],
               ),
