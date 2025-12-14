@@ -41,6 +41,7 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
       if (resp is Map && resp['success'] == true && resp['paymentMethods'] is List) {
         final list = (resp['paymentMethods'] as List).map((e) => Map<String, dynamic>.from(e)).toList();
         //print all payment methods
+       print('Fetched Payment Methods:');
         for (var method in list) {
           print('Payment Method: $method');
         }
@@ -340,7 +341,8 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
                 "ADD NEW PAYMENT METHOD",
                 style: TextStyle(color: Colors.lightGreen),
               ),
-            )
+            ),
+            const SizedBox(height: 30),
                             // Add New Payment Method
    ],
           

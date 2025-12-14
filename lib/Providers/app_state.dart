@@ -37,10 +37,17 @@ class AppState extends ChangeNotifier {
   DateTime? _updatedAt;
   int _v = 0;
 
+//also add these market stats: totalInvestment=41 (int),portfolioValue=40.87 (double),profitLoss=-0.13 (double),percentChange=-0.32 (double)
+  int _totalInvestment = 0;
+  double _portfolioValue = 0.0;
+  double _profitLoss = 0.0;
+  double _percentChange = 0.0;
+
   // Getters
   String? get authToken => _authToken;
   Map<String, dynamic>? get userProfile => _userProfile;
   bool get isLoadingProfile => _isLoadingProfile;
+
 
   // Typed getters
   Map<String, dynamic> get preferences => _preferences;
@@ -67,12 +74,37 @@ class AppState extends ChangeNotifier {
   DateTime? get createdAt => _createdAt;
   DateTime? get updatedAt => _updatedAt;
   int get v => _v;
+  int get totalInvestment => _totalInvestment;
+  double get portfolioValue => _portfolioValue;
+  double get profitLoss => _profitLoss;
+  double get percentChange => _percentChange;
+  bool get isProfit => _profitLoss > 0;
 
   // Setters
   void setAuthToken(String token) {
     _authToken = token;
     notifyListeners();
   }
+
+  void setTotalInvestment(int value) {
+    _totalInvestment = value;
+    notifyListeners();
+  }
+  void setPortfolioValue(double value) {
+    _portfolioValue = value;
+    notifyListeners();
+  }
+  void setProfitLoss(double value) {
+    _profitLoss = value;
+    notifyListeners();
+  }
+  void setPercentChange(double value) {
+    _percentChange = value;
+    notifyListeners();
+  }
+
+  
+  // Set user profile and populate typed fields
 
   void setUserProfile(Map<String, dynamic>? profile) {
     _userProfile = profile;

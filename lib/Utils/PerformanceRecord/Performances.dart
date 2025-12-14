@@ -52,6 +52,15 @@ class _PortfolioPerformanceState extends State<PortfolioPerformance> {
               ? response['percentChange']
               : (num.tryParse(response['percentChange']?.toString() ?? '') ?? 0);
         });
+        //prin the fetched values and their types
+        print('Fetched market stats: totalInvestment=$_totalInvestment (${_totalInvestment.runtimeType}),portfolioValue=$_portfolioValue (${_portfolioValue.runtimeType}),profitLoss=$_profitLoss (${_profitLoss.runtimeType}),percentChange=$_percentChange (${_percentChange.runtimeType})');
+
+        //set the Appstate value for all these values too
+        final appState = Provider.of<AppState>(context, listen: false);
+        appState.setTotalInvestment(_totalInvestment.ceil());
+        appState.setPortfolioValue(_portfolioValue as double);
+        appState.setProfitLoss(_profitLoss as double);
+        appState.setPercentChange(_percentChange as double);
       }
     } catch (e) {
       print('Error fetching market stats: $e');

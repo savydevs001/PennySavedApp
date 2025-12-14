@@ -1,9 +1,67 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:penny/Screens/mainScreen/Screens/Wallet/Withdrawal/ConfirmWithdrawal.dart/SubmittionWithDrawal/SubmittionWithDrawal.dart';
+import 'package:penny/Services/api_service.dart';
+import 'package:penny/Utils/api_config.dart';
+import 'package:penny/Services/auth_service.dart';
 
-class WithdrawConfirmationScreen extends StatelessWidget {
-  const WithdrawConfirmationScreen({super.key});
+class WithdrawConfirmationScreen extends StatefulWidget {
+  final int amount;
+  final String accountId;
+
+  const WithdrawConfirmationScreen({super.key, required this.amount, required this.accountId});
+
+  @override
+  _WithdrawConfirmationScreenState createState() => _WithdrawConfirmationScreenState();
+}
+
+class _WithdrawConfirmationScreenState extends State<WithdrawConfirmationScreen> {
+  bool _loading = false;
+
+  Future<void> _submitWithdrawal() async {
+    if (_loading) return;
+    setState(() {
+      _loading = true;
+    });
+
+    try {
+      final api = ApiService(baseUrl: ApiConfig.baseUrl);
+      final token = await AuthService().getToken();
+      Map<String, String> headers = {'Content-Type': 'application/json'};
+      if (token != null) headers['Authorization'] = 'Bearer $token';
+
+      final resp = await api.post('/payment/withdraw', {
+        'amount': widget.amount,
+        'accountId': widget.accountId,
+      }, headers: headers);
+
+      print('Withdraw response: $resp');
+
+      if (!mounted) return;
+
+      if (resp is Map && resp['success'] == true) {
+        final msg = resp['message']?.toString() ?? 'Withdrawal initiated';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => WithdrawRequestSubmittedScreen()),
+        );
+      } else {
+        final err = (resp is Map && resp['message'] != null) ? resp['message'].toString() : 'Withdrawal failed';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+      }
+    } catch (e) {
+      print('Error submitting withdrawal: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,10 +107,10 @@ class WithdrawConfirmationScreen extends StatelessWidget {
                       style: TextStyle(color: Colors.white70, fontSize: 14),
                     ),
                     const SizedBox(height: 12),
-                    _buildDetailRow("Payment Method", "****1234 Debit Card"),
-                    _buildDetailRow("Withdrawal Amount", "\$2,450"),
+                    _buildDetailRow("Payment Method", widget.accountId),
+                    _buildDetailRow("Withdrawal Amount", "\$${widget.amount}"),
                     _buildDetailRow("Fees", "\$2"),
-                    _buildDetailRow("Total Amount", "\$2,448"),
+                    _buildDetailRow("Total Amount", "\$${widget.amount - 2}"),
                     _buildDetailRow(
                         "Estimated Transfer Time", "1 - 3 Business Days"),
                     const SizedBox(height: 20),
@@ -62,13 +120,8 @@ class WithdrawConfirmationScreen extends StatelessWidget {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) =>
-                                    WithdrawRequestSubmittedScreen()),
-                          );
+                        onPressed: _loading ? null : () async {
+                          await _submitWithdrawal();
                         }, // Handle withdrawal
                         style: ElevatedButton.styleFrom(
                           backgroundColor:
@@ -78,11 +131,20 @@ class WithdrawConfirmationScreen extends StatelessWidget {
                             borderRadius: BorderRadius.circular(25),
                           ),
                         ),
-                        child: const Text("Confirm & Withdraw",
-                            style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold)),
+                        child: _loading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text("Confirm & Withdraw",
+                                style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold)),
                       ),
                     ),
                   ],

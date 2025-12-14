@@ -67,7 +67,9 @@ class _mainScreenState extends State<mainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isLoading = Provider.of<AppState>(context).isLoadingProfile;
+        AppState appState = Provider.of<AppState>(context);
+
+    final isLoading = appState.isLoadingProfile;
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color.fromRGBO(22, 22, 33, 1),
@@ -112,20 +114,20 @@ class _mainScreenState extends State<mainScreen> {
               const Logo(),
               const SizedBox(height: 10),
               const SizedBox(height: 5),
-              const Row(children: [
+              Row(children: [
                 SizedBox(
                   width: 70,
                 ),
                 Column(children: [
                   Text(
-                    "\$78,450",
+                    "\$${appState.walletBalance.toStringAsFixed(2)}",
                     style: TextStyle(
                         color: Colors.white,
                         fontSize: 18,
                         fontWeight: FontWeight.bold),
                   ),
                   Text(
-                    "Hello, Hazem",
+                    "Hello ${appState.firstName}",
                     style: TextStyle(color: Colors.white70, fontSize: 14),
                   ),
                 ]),

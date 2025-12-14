@@ -1,14 +1,21 @@
+import 'dart:ffi';
+
 import 'package:flutter/material.dart';
+import 'package:penny/Providers/app_state.dart';
 import 'package:penny/Screens/mainScreen/Screens/Wallet/AddFunds/AddFund.dart';
 import 'package:penny/Screens/mainScreen/Screens/Wallet/PaymentMethods/index.dart';
 import 'package:penny/Screens/mainScreen/Screens/Wallet/RecurringTopUp/Index.dart';
 import 'package:penny/Screens/mainScreen/Screens/Wallet/Withdrawal/withdrawal.dart';
+import 'package:provider/provider.dart';
 
 class WalletBalance extends StatelessWidget {
   const WalletBalance({super.key});
 
   @override
   Widget build(BuildContext context) {
+    AppState appState = Provider.of<AppState>(context);
+    String bal = appState.walletBalance.toString();
+    double profit=appState.profitLoss;
     return Container(
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
@@ -21,7 +28,7 @@ class WalletBalance extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text("Total Balance",
@@ -30,7 +37,7 @@ class WalletBalance extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                           color: Colors.white)),
                   SizedBox(height: 10),
-                  Text("\$21,459",
+                  Text("\$$bal",
                       style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
@@ -40,12 +47,14 @@ class WalletBalance extends StatelessWidget {
               Container(
                 decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(5),
-                    color: const Color.fromRGBO(76, 175, 80, 0.5)),
-                child: const Padding(
+                    color: profit >= 0
+                        ? const Color.fromRGBO(76, 175, 80, 0.16)
+                        : Colors.red.withOpacity(0.16)),
+                child: Padding(
                   padding: EdgeInsets.only(left: 8.0, right: 8),
-                  child: Text("+29%",
+                  child: Text("${profit.toStringAsFixed(2)}",
                       style: TextStyle(
-                        color: Color.fromRGBO(133, 187, 101, 1),
+                        color: profit >= 0 ? const Color.fromRGBO(76, 175, 80, 1) : Colors.red,
                         fontSize: 16,
                       )),
                 ),

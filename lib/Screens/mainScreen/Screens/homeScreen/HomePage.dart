@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:penny/Providers/app_state.dart';
 import 'package:penny/Utils/PerformanceRecord/Performances.dart';
+import 'package:provider/provider.dart';
 
 class HomePage extends StatelessWidget {
   static route() => MaterialPageRoute(builder: (context) => const HomePage());
@@ -7,14 +9,15 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppState appState = Provider.of<AppState>(context);
     return Scaffold(
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              "Hello, Hazem",
+            Text(
+              "Hello ${appState.firstName}",
               style: TextStyle(
                   color: Color.fromRGBO(133, 187, 101, 1),
                   fontSize: 16,
