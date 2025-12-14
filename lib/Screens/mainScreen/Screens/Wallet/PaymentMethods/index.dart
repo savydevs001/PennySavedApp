@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:penny/Providers/app_state.dart';
 import 'package:penny/Screens/mainScreen/Notification/index.dart';
 import 'package:penny/Screens/mainScreen/Screens/Wallet/PaymentMethods/CardInfo/CardInfo.dart';
 import 'package:penny/Services/api_service.dart';
@@ -38,6 +40,10 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
       final resp = await api.get('/payment/saved-methods', headers: headers);
       if (resp is Map && resp['success'] == true && resp['paymentMethods'] is List) {
         final list = (resp['paymentMethods'] as List).map((e) => Map<String, dynamic>.from(e)).toList();
+        //print all payment methods
+        for (var method in list) {
+          print('Payment Method: $method');
+        }
         setState(() {
           paymentMethods = list;
         });
@@ -212,18 +218,132 @@ class _PaymentMethodScreenState extends State<PaymentMethodScreen> {
             }),
             const Spacer(),
             ElevatedButton(
-              onPressed: isChanged ? () {} : null,
+              onPressed:                   ()  {
+                      CardFieldInputDetails? _card;
+                      //make a popup widget that uses stripe card form to add a new payment method to the user
+                      //use the stripe flutter package
+                      showDialog(
+                        context: context,
+                        builder: (BuildContext context) {
+                          //use the stripe card form widget
+
+                          //along with the card form, add a button to submit the card details
+                          return AlertDialog(
+                            backgroundColor: const Color(0xFF1E1E26),
+                            title: const Text("Add New Payment Method",
+                                style: TextStyle(color: Colors.white)),
+                            content: SizedBox(
+                                height: 400,
+                                child: Column(
+                                  children: [
+                                    CardFormField(
+                                      style: CardFormStyle(
+                                          textColor: Colors.white),
+                                      dangerouslyUpdateFullCardDetails: true,
+                                      dangerouslyGetFullCardDetails: true,
+                                      onCardChanged: (card) {
+                                        _card = card;
+                                      },
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () async {
+                                        try {
+                                          if (_card == null ||
+                                              !_card!.complete) {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              const SnackBar(
+                                                  content: Text(
+                                                      'Please enter complete card details')),
+                                            );
+                                            return;
+                                          }
+                                          final paymentMethod = await Stripe
+                                              .instance
+                                              .createPaymentMethod(
+                                            params: PaymentMethodParams.card(
+                                              paymentMethodData:
+                                                  PaymentMethodData(
+                                                billingDetails: BillingDetails(
+                                                  name: AppState().firstName +
+                                                      ' ' +
+                                                      AppState().lastName,
+                                                  email: AppState().email,
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                          print(
+                                              'Payment Method created: $paymentMethod');
+                                          // Send PaymentMethod ID to backend
+                                          final ApiService _apiService =
+                                              ApiService(
+                                                  baseUrl: ApiConfig.baseUrl);
+                                          try {
+                                            final response =
+                                                await _apiService.post(
+                                              "/payment/save-card", // relative endpoint
+                                              {
+                                                "paymentMethodId":
+                                                    paymentMethod.id,
+                                              },
+                                            );
+                                            // Handle backend response
+                                            if (response["success"] == true) {
+                                              final card = response["card"];
+                                              print(
+                                                  "Card saved successfully: ${card["brand"]} ****${card["last4"]}");
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                const SnackBar(
+                                                    content: Text(
+                                                        'Card added successfully')),
+                                              );
+                                            } else {
+                                              print(
+                                                  "Failed to save card: $response");
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                SnackBar(
+                                                    content: Text(
+                                                        'Failed to add card: ${response["message"]}')),
+                                              );
+                                            }
+                                          } catch (e) {
+                                            print(
+                                                "Error saving card to backend: $e");
+                                          }
+
+                                          Navigator.of(context).pop();
+                                        } catch (e) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                                content: Text('Error: $e')),
+                                          );
+                                        }
+                                      },
+                                      child: const Text("Add Card"),
+                                    ),
+                                  ],
+                                )),
+                          );
+                        },
+                      );
+                    },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.grey[700],
                 disabledBackgroundColor: Colors.grey[800],
                 minimumSize: const Size(double.infinity, 50),
               ),
               child: const Text(
-                "Save Changes",
-                style: TextStyle(color: Colors.white),
+                "ADD NEW PAYMENT METHOD",
+                style: TextStyle(color: Colors.lightGreen),
               ),
-            ),
-          ],
+            )
+                            // Add New Payment Method
+   ],
+          
         ),
       ),
     );

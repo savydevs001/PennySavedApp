@@ -16,23 +16,21 @@ class CustomButton extends StatelessWidget {
     double screenHeight = MediaQuery.of(context).size.height;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Expanded(
-        child: GestureDetector(
-          onTap: onPress,
-          child: Container(
-            height: screenHeight * 0.05,
-            width: screenWidth * 0.9,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: const Color.fromRGBO(133, 187, 101, 1),
-              borderRadius: BorderRadius.circular(30),
-            ),
-            child: Text(
-              name,
-              style: const TextStyle(
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
-              ),
+      child: GestureDetector(
+        onTap: onPress,
+        child: Container(
+          height: screenHeight * 0.05,
+          width: screenWidth * 0.9,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: const Color.fromRGBO(133, 187, 101, 1),
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Text(
+            name,
+            style: const TextStyle(
+              color: Colors.black,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ),

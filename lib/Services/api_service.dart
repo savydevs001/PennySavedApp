@@ -94,6 +94,8 @@ class ApiService {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return jsonDecode(response.body);
     } else {
+      //print the complete response for debugging
+      print('Error Response: ${response.statusCode} - ${response.body}');
       throw Exception('Error: ${response.statusCode}, ${response.body}');
     }
   }

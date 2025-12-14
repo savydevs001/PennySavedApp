@@ -5,7 +5,13 @@ import 'package:penny/Services/auth_service.dart';
 import 'package:penny/Providers/app_state.dart';
 import 'package:penny/Screens/mainScreen/index.dart';
 import 'package:penny/Screens/signUp.dart';
-void main() {
+import 'package:flutter_stripe/flutter_stripe.dart';
+void main() async{
+  WidgetsFlutterBinding.ensureInitialized();
+  Stripe.publishableKey = 'pk_test_51RpFIsQRaQw4CMhiugQ1h7MJyH1tcdXSlzfbtbMygoDpj8qkryct9lWszfjL5VUjBFJi9nxaZkQvJXSybdK7Cswj00eLTN1R2S';
+  Stripe.merchantIdentifier = 'merchant.flutter.stripe.test';
+  Stripe.urlScheme = 'flutterstripe';
+  await Stripe.instance.applySettings();
   runApp(const MyApp());
 }
 
@@ -19,6 +25,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+
     return FutureBuilder<bool>(
       future: _checkAuthentication(),
       builder: (context, snapshot) {
