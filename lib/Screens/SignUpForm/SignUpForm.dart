@@ -77,14 +77,16 @@ class _SignUpFormState extends State<SignUpForm> {
           Row(mainAxisAlignment: MainAxisAlignment.center, children: [
             SizedBox(
               width: screenWidth * 0.5,
-              child: const CustomTextField(
+              child: CustomTextField(
+                controller: _firstNameController,
                 hintText: 'First Name',
                 labelText: 'First Name',
               ),
             ),
             SizedBox(
               width: screenWidth * 0.5,
-              child: const CustomTextField(
+              child: CustomTextField(
+                controller: _lastNameController,
                 hintText: 'Last Name',
                 labelText: 'Last Name',
               ),
