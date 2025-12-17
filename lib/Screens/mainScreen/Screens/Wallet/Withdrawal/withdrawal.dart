@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_launcher_icons/constants.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:penny/Providers/app_state.dart';
 import 'package:penny/Screens/mainScreen/Screens/Wallet/Withdrawal/ConfirmWithdrawal.dart/ConfirmWithdrawal.dart';
@@ -7,6 +8,7 @@ import 'package:penny/Services/api_service.dart';
 import 'package:penny/Utils/api_config.dart';
 import 'package:penny/Services/auth_service.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class WithdrawFundsScreen extends StatefulWidget {
   const WithdrawFundsScreen({super.key});
@@ -76,13 +78,21 @@ class _WithdrawFundsScreenState extends State<WithdrawFundsScreen> {
       Map<String, String> headers = {'Content-Type': 'application/json'};
       if (token != null) headers['Authorization'] = 'Bearer $token';
 
-      final resp = await api.get(ApiConfig.onboardingLink, headers: headers);
+      final resp = await api.post(ApiConfig.onboardingLink,{}, headers: headers);
       print('Onboarding response: $resp');
 
-      if (resp is Map && resp['success'] == true && resp['url'] != null) {
+      if (resp is Map && resp['url'] != null) {
         onboardingLink = resp['url'].toString();
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Onboarding link: $onboardingLink')));
+        if (onboardingLink != null) {
+          final uri = Uri.parse(onboardingLink!);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not launch onboarding link')));
+          }
+        }
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not get onboarding link')));

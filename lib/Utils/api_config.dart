@@ -20,5 +20,5 @@ class ApiConfig {
   static const String disable2faVerify = '/auth/disable-2fa/verify-otp';
   static const String contact = '/auth/contact';
   static const String stripeStatus = '/payment/stripe-status';
-  static const String onboardingLink = '/payment/onboarding-link';
+  static const String onboardingLink = '/payment/connect-account';
 }
